@@ -13,3 +13,32 @@ This dataset lists all-electric cars that, as of December 2, 2020, could be purc
 The collection does not contain data on hybrid cars and electric cars of so-called “range extenders”. Hydrogen cars were also not included in the dataset due to the insufficient number of mass-produced models and the different specificity (compared to electric vehicle) of the vehicle, including the different charging methods.
 
 The database composed of 53 electric cars (each variant of a model – which differs in terms of battery capacity, engine power, etc. – is treated separately) and 22 variables (25 variables, including brand, model and “car name”). car” merging these two previous ones).
+
+
+## Attribute List
+
+- Car full name	
+- Make	
+- Model	Minimal price (gross) [PLN]	
+- Engine power [KM]	
+- Maximum torque [Nm]	
+- Type of brakes	
+- Drive type	
+- Battery capacity [kWh]	
+- Range (WLTP) [km]	
+- Wheelbase [cm]	
+- Length [cm]	
+- Width [cm]	
+- Height [cm]	
+- Minimal empty weight [kg]	
+- Permissable gross weight [kg]	
+- Maximum load capacity [kg]	
+- Number of seats	
+- Number of doors
+- Tire size [in]
+- Maximum speed [kph]
+- Boot capacity (VDA) [l]
+- Acceleration 0-100 kph [s]
+- Maximum DC charging power [kW]	
+- mean - Energy consumption [kWh/100 km]
+
