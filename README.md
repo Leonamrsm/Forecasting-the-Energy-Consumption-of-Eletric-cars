@@ -1,6 +1,6 @@
 # Forecasting the Energy Consumption of Eletric Cars
 
-![](img/eletric-car.jpg)
+<img src="img/eletric-car.jpg" alt="Descrição da imagem" width="500" height="300">
 
 A transport and logistics company wants to migrate its fleet to electric cars in order to reduce costs.
 
