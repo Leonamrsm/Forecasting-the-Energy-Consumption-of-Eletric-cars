@@ -4,7 +4,7 @@ A transport and logistics company wants to migrate its fleet to electric cars in
 
 Before making the decision, the company would like to forecast the energy consumption of electric cars based on various usage factors and vehicle characteristics.
 
-Using a dataset with real data available [publicly (https://data.mendeley.com/datasets/tb9yrptydn/2), a Machine Learning model will be built capable of predicting the energy consumption of electric cars based on several factors, such as the type and number of electric motors in the vehicle, vehicle weight, load capacity, among other attributes.
+Using a real dataset with [publicly available](https://data.mendeley.com/datasets/tb9yrptydn/2), a Machine Learning model will be built capable of predicting the energy consumption of electric cars based on several factors, such as the type and number of electric motors in the vehicle, vehicle weight, load capacity, among other attributes.
 
 This dataset lists all-electric cars that, as of December 2, 2020, could be purchased in Poland as new at an authorized dealership and those available in public and general pre-sale, but only if a publicly available price list with complete equipment versions and technical parameters was available. with your attributes
 
