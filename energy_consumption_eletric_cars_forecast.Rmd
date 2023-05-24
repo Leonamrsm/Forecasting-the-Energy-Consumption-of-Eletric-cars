@@ -1,0 +1,980 @@
+---
+title: "Evergy Consuption of Electric Cars"
+output: html_notebook
+---
+
+# Entender o Problema
+
+Uma empresa da área de transporte e logística deseja migrar sua frota para carros
+elétricos com o objetivo de reduzir os custos.
+
+Antes de tomar a decisão, a empresa gostaria de prever o consumo de energia de carros
+elétricos com base em diversos fatores de utilização e características dos veículos.
+
+Usando um dataset com dados reais disponíveis [publicamente](https://data.mendeley.com/datasets/tb9yrptydn/2), será
+construido um modelo de Machine Learning capaz de prever o consumo de energia de carros
+elétricos com base em diversos fatores, tais como o tipo e número de motores elétricos do
+veículo, o peso do veículo, a capacidade de carga, entre outros atributos.
+
+Este conjunto de dados lista carros totalmente elétricos que, a partir de 2 de dezembro de 2020, poderiam ser adquiridos na Polônia como novos em uma concessionária autorizada e aqueles disponíveis em pré-venda pública e geral, mas somente se uma lista de preços disponível publicamente com versões de equipamentos e parâmetros técnicos completos estivesse disponível. com seus atributos
+
+A coleção não contém dados sobre carros híbridos e carros elétricos dos chamados “extensores de alcance”. Os carros a hidrogênio também não foram incluídos no conjunto de dados devido ao número insuficiente de modelos produzidos em massa e à especificidade diferente (em comparação com veículo elétrico) do veículo, incluindo os diferentes métodos de carregamento.
+
+O banco de dados composto por 53 carros elétricos (cada variante de um modelo – que difere em termos de capacidade da bateria, potência do motor etc. – é tratada separadamente) e 22 variáveis (25 variáveis, incluindo marca, modelo e “nome do carro” mesclando estes dois anteriores).
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(moments)
+library(corrplot)
+library(vcd)
+library(reshape2)
+library(gridExtra)
+library(car)
+library(caret)
+library(randomForest)
+library(Boruta)
+library(glmnet)
+library(rpart)
+library(randomForest)
+library(e1071)
+```
+
+
+## Carregando os dados
+
+```{r}
+dados <- read_excel("data/FEV-data-Excel.xlsx", col_types = "guess")
+```
+
+
+# PASSO 01 - Descrição dos Dados
+
+## 1.1 Renomear colunas
+
+
+```{r}
+colnames(dados) <- c('nomeCarro', 'marca', 'modelo', 'precoMinimoBrutoPLN', 'potenciaMotorKM', 'torqueMaximoNm', 'tipoFreios', 'tipoTracao', 'capacidadeBateriaKWh', 'autonomiaWLTPkm', 'distanciaEntreEixosCm', 'comprimentoCm', 'larguraCm', 'alturaCm', 'pesoMinimoVazioKg', 'pesoBrutoPermissivelKg', 'capacidadeMaximaCargaKg', 'numeroAssentos', 'numeroPortas', 'tamanhoPneuPol', 'velocidadeMaximaKmH', 'capacidadePortaMalasLitros', 'aceleracao0a100KmHS', 'potenciaMaximaCarregamentoDCKW', 'mediaConsumoEnergiaKWh100Km')
+
+colnames(dados)
+```
+
+
+```{r}
+# Vizualiza dos dados
+head(dados)
+```
+
+
+## 1.2 Data Dimension 
+
+```{r}
+print(paste("Number of rows ", nrow(dados)))
+print(paste("Number of columns ", ncol(dados)))
+
+```
+
+
+## 1.3 Data Types
+
+```{r}
+str(dados)
+```
+
+## 1.4 Check NAs
+
+```{r}
+# Contagem de linhas com dados completos
+sum(complete.cases(dados))
+```
+
+```{r}
+# Contagem de linhas com dados incompletos
+sum(!complete.cases(dados))
+```
+
+
+```{r}
+colSums(is.na(dados))
+```
+
+## 1.4 Preencher NAs
+
+Como o conjunto de dados é pequeno e 11 linhas não possuem dados completos, será feito imputation dos dados.
+
+#### [Mercedes-Benz EQV (long)](https://www.ultimatespecs.com/car-specs/Mercedes-Benz/120227/Mercedes-Benz-EQV-300-Long.html)
+
+- tipoFreios = disc (front + rear)
+- aceleracao0a100KmHS = 12.1s
+- capacidadePortaMalasLitros = 978.5
+  
+```{r}
+dados[dados$nomeCarro == 'Mercedes-Benz EQV (long)', "tipoFreios"] <- "disc (front + rear)"
+dados[dados$nomeCarro == 'Mercedes-Benz EQV (long)', "aceleracao0a100KmHS"] <- 12.1
+dados[dados$nomeCarro == 'Mercedes-Benz EQV (long)', "capacidadePortaMalasLitros"] <- 978.5
+```
+  
+
+#### [Tesla Model 3 Standard Range Plus](https://ev-database.org/car/1485/Tesla-Model-3-Standard-Range-Plus)
+
+- capacidadeMaximaCargaKg = 389 kg
+- pesoBrutoPermissivelKg = 2014 kg
+- mediaConsumoEnergiaKWh100Km = 14.6 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == 'Tesla Model 3 Standard Range Plus', "capacidadeMaximaCargaKg"] <- 389
+dados[dados$nomeCarro == 'Tesla Model 3 Standard Range Plus', "pesoBrutoPermissivelKg"] <- 2014
+dados[dados$nomeCarro == 'Tesla Model 3 Standard Range Plus', "mediaConsumoEnergiaKWh100Km"] <- 14.6
+```
+
+
+#### [Peugeot-e-2008](https://ev-database.org/car/1206/Peugeot-e-2008-SUV)
+- capacidadeMaximaCargaKg = 482 kg
+- pesoBrutoPermissivelKg = 2030 kg
+- aceleracao0a100KmHS = 8.5 s
+- mediaConsumoEnergiaKWh100Km = 18.2 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == 'Peugeot e-2008', "capacidadeMaximaCargaKg"] <- 389
+dados[dados$nomeCarro == 'Peugeot e-2008', "pesoBrutoPermissivelKg"] <- 2030
+dados[dados$nomeCarro == 'Peugeot e-2008', "aceleracao0a100KmHS"] <- 8.5
+dados[dados$nomeCarro == 'Peugeot e-2008', "mediaConsumoEnergiaKWh100Km"] <- 18.2
+```
+
+
+#### [Citroën ë-C4](https://ev-database.org/car/1587/Citroen-e-C4)
+- mediaConsumoEnergiaKWh100Km = 16.8 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == 'Citroën ë-C4', "mediaConsumoEnergiaKWh100Km"]  <- 16.8
+```
+
+
+#### [Tesla Model 3 Long Range](https://ev-database.org/car/1591/Tesla-Model-3-Long-Range-Dual-Motor)
+- capacidadeMaximaCargaKg = 388 kg
+- pesoBrutoPermissivelKg = 2232
+ -mediaConsumoEnergiaKWh100Km = 15,5 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == "Tesla Model 3 Long Range", "capacidadeMaximaCargaKg"] <- 388
+dados[dados$nomeCarro == "Tesla Model 3 Long Range", "pesoBrutoPermissivelKg"] <- 2232
+dados[dados$nomeCarro == "Tesla Model 3 Long Range", "mediaConsumoEnergiaKWh100Km"] <- 15.5
+```
+
+ 
+#### [Tesla Model 3 Performance](https://ev-database.org/car/1620/Tesla-Model-3-Performance)
+- capacidadeMaximaCargaKg = 388 kg
+- pesoBrutoPermissivelKg = 2232
+- mediaConsumoEnergiaKWh100Km = 16,3 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == "Tesla Model 3 Performance", "capacidadeMaximaCargaKg"] <- 388
+dados[dados$nomeCarro == "Tesla Model 3 Performance", "pesoBrutoPermissivelKg"] <- 2232
+dados[dados$nomeCarro == "Tesla Model 3 Performance", "mediaConsumoEnergiaKWh100Km"] <- 16.3
+```
+
+#### [Tesla Model S Long Range Plus](https://ev-database.org/car/1323/Tesla-Model-S-Long-Range-Plus)
+- capacidadeMaximaCargaKg = 394 kg
+- pesoBrutoPermissivelKg = 2574 kg
+- mediaConsumoEnergiaKWh100Km = 17,7 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == "Tesla Model S Long Range Plus", "capacidadeMaximaCargaKg"] <- 394
+dados[dados$nomeCarro == "Tesla Model S Long Range Plus", "pesoBrutoPermissivelKg"] <- 2574
+dados[dados$nomeCarro == "Tesla Model S Long Range Plus", "mediaConsumoEnergiaKWh100Km"] <- 17.7
+
+```
+
+#### [Tesla Model S Performance](https://ev-database.org/car/1324/Tesla-Model-S-Performance)
+- capacidadeMaximaCargaKg = 394 kg
+- pesoBrutoPermissivelKg = 2626 kg
+- mediaConsumoEnergiaKWh100Km = 18,3 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == "Tesla Model S Performance", "capacidadeMaximaCargaKg"] <- 394
+dados[dados$nomeCarro == "Tesla Model S Performance", "pesoBrutoPermissivelKg"] <- 2626
+dados[dados$nomeCarro == "Tesla Model S Performance", "mediaConsumoEnergiaKWh100Km"] <- 18.3
+
+```
+
+#### [Tesla Model X Long Range Plus](https://ev-database.org/car/1325/Tesla-Model-X-Long-Range-Plus)
+- capacidadeMaximaCargaKg = 610 kg
+- pesoBrutoPermissivelKg = 3040 kg
+- mediaConsumoEnergiaKWh100Km = 20,4 kWh/100 km
+
+
+
+```{r}
+dados[dados$nomeCarro == "Tesla Model X Long Range Plus", "capacidadeMaximaCargaKg"] <- 610
+dados[dados$nomeCarro == "Tesla Model X Long Range Plus", "pesoBrutoPermissivelKg"] <- 3040
+dados[dados$nomeCarro == "Tesla Model X Long Range Plus", "mediaConsumoEnergiaKWh100Km"] <- 20.4
+
+```
+
+#### [Tesla Model X Performance](https://ev-database.org/car/1326/Tesla-Model-X-Performance)
+- capacidadeMaximaCargaKg = 610 kg
+- pesoBrutoPermissivelKg = 3087 kg
+- mediaConsumoEnergiaKWh100Km = 20,9 kWh/100 km
+
+```{r}
+dados[dados$nomeCarro == "Tesla Model X Performance", "capacidadeMaximaCargaKg"] <- 610
+dados[dados$nomeCarro == "Tesla Model X Performance", "pesoBrutoPermissivelKg"] <- 3087
+dados[dados$nomeCarro == "Tesla Model X Performance", "mediaConsumoEnergiaKWh100Km"] <- 20.9
+
+```
+
+#### [Nissan e-NV200 evalia](https://ev-database.org/car/1117/Nissan-e-NV200-Evalia)
+- aceleracao0a100KmHS = 14.0s
+  
+```{r}
+dados[dados$nomeCarro == "Nissan e-NV200 evalia", "aceleracao0a100KmHS"] <- 14.0
+```
+
+```{r}
+# Contagem de linhas com dados incompletos
+sum(!complete.cases(dados))
+```
+
+## 1.7 Estatísticas descritivas
+
+### 1.7.1 Atributos Numericos
+
+
+```{r}
+
+get_descriptive_analysis <- function(dados){
+
+mean <- apply(dados, 2, mean, na.rm = TRUE)
+std <- apply(dados, 2, sd, na.rm = TRUE)
+min <- apply(dados, 2, min, na.rm = TRUE)
+max <- apply(dados, 2, max, na.rm = TRUE)
+median <- apply(dados, 2, median, na.rm = TRUE)
+quartis <- apply(dados, 2, quantile, probs = c(0.25, 0.75), na.rm = TRUE)
+IQR <- apply(dados, 2, IQR, na.rm = TRUE)
+skew <- apply(dados, 2, skewness, na.rm = TRUE)
+kurtosis <- apply(dados, 2, kurtosis, na.rm = TRUE)
+
+result <- data.frame(min, max, max-min, mean, median, std, skew, kurtosis)
+
+
+names(result) <- c("min", "max", "range", "mean", "median", "std", "skew", "kurtosis")
+
+return(result)
+}
+
+get_descriptive_analysis(dados %>% select_if(is.numeric))
+```
+
+### 1.7.1 Atributos Categoricos
+
+```{r}
+# Selecionar as variáveis categóricas
+names(select(dados, where(is.character) | where(is.factor)))
+```
+
+As variáveis nomeCarro, modelo e marca serão desconsideradas durante a análise. Muitas marcas possuem apenas uma amostra na base de dados.
+
+
+```{r}
+ggplot(dados, aes(x = tipoFreios, y = mediaConsumoEnergiaKWh100Km, fill=tipoFreios )) +
+     geom_boxplot() +
+     xlab("Tipo de Freios") +
+     ylab("Consumo (KWh/100Km)") +
+     theme_bw() +
+     theme(legend.position = "none")
+```
+
+
+```{r}
+ggplot(dados, aes(x = tipoTracao, y = mediaConsumoEnergiaKWh100Km, fill=tipoTracao)) +
+     geom_boxplot() +
+     xlab("Tipo de Tracao") +
+     ylab("Consumo (KWh/100Km)") +
+     theme_bw() +
+     theme(legend.position = "none")
+```
+
+
+
+# PASSO 02 -  Seleção da Colunas
+
+```{r}
+# Remover colunas pelo nome
+dados <- subset(dados, select = -c(nomeCarro, marca, modelo))
+
+# Exibir as colunas do data frame resultante
+colnames(dados)
+```
+
+```{r}
+# Transformar variáveis categóricas em fatores
+dados$tipoFreios <- as.factor(dados$tipoFreios)
+dados$tipoTracao <- as.factor(dados$tipoTracao)
+str(dados)
+```
+
+
+
+# Passo 3 - Análise Exploratória dos dados
+
+Como há poucas amostras no conjunto de dados a separação dos dados de treino e teste será realizada após a a analse exploratória dos dados.
+
+
+## 3.1 Análise Univariada
+
+### 3.1.1 Variável Resposta
+
+```{r}
+# Crie o histograma com curva de densidade usando ggplot2
+ggplot(data = dados, aes(x = mediaConsumoEnergiaKWh100Km)) +
+  geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "steelblue", color = "black") +
+  geom_density(fill = "lightblue", alpha = 0.5, color = "blue") +
+  labs(x = "Média Consumo de Energia (KWh/100Km)", y = "Frequência") +
+  theme_minimal()
+```
+
+
+
+### 3.1.2 Variaveis Numéricas
+
+```{r}
+# Plotando boxplots para cada variável numérica em um único gráfico
+dados %>% select_if(is.numeric) %>%
+  gather(variable, value ) %>%
+  ggplot( aes(x=value)) +
+  geom_boxplot() +
+  facet_wrap(~ variable, ncol = 4, scales = "free")
+```
+```{r}
+
+# Verificar quais colunas têm valores discrepantes (outliers)
+outliers <- apply(dados %>% select_if(is.numeric), 2, function(x) any(boxplot.stats(x)$out))
+outliers
+
+
+```
+
+```{r}
+# Plotando histogramas para cada variável numérica em um único gráfico
+dados %>% select_if(is.numeric) %>%
+  gather(variable, value) %>%
+  ggplot( aes(x=value)) +
+  geom_histogram() +
+  facet_wrap(~ variable, ncol = 4, scales = "free")
+```
+
+```{r}
+# Define a estrutura da figura
+par(mar = c(2, 2, 2, 2))  # Definir margens menores
+layout(matrix(1:20, 5, 4, byrow = TRUE))
+
+# Inicializar a lista para salvar os valores-p
+p_values <- list()
+
+
+for (coluna in colnames(dados)) {
+  if (is.numeric(dados[[coluna]])) {
+    # Gerar o qqplot para a coluna numérica
+    
+    # qqPlot(dados[[coluna]], ylab = coluna)
+    
+    # Calcular o valor-p para o teste de normalidade
+    shapiro <- shapiro.test(dados[[coluna]])
+    p_value <- shapiro$p.value
+    
+    # Adicionar o valor-p à lista
+    p_values[[coluna]] <- p_value
+  }
+}
+
+
+
+as.data.frame(p_values) %>%
+  gather(variable, 'p_value' ) %>%
+  mutate(rejeitou_H0 = p_value < 0.05)
+
+rm(p_values, p_value, shapiro, coluna)
+```
+
+Apenas as variáveis autonomiaWLTPkm e aceleracao0a100KmHS possuem evidências suficientes para não rejeitarem a hipótese nula de que as suas distribuições são normais.
+
+
+### 3.1.3 Variáveis Categóricas
+
+```{r}
+# Criar o gráfico de barras com ggplot2
+p1 <- ggplot(data = dados, aes(x = tipoFreios, y = mediaConsumoEnergiaKWh100Km, fill = tipoFreios)) +
+  geom_bar(stat = "summary", fun = "mean", color = "black") +
+  labs(x = "state_holiday", y = "Média do Consumo de Energia") + 
+  theme(legend.position = "none")
+
+# Criação do gráfico de densidade
+p2 <- ggplot(dados, aes(x = mediaConsumoEnergiaKWh100Km, fill = tipoFreios)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_discrete(name = "Tipo de Freios") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# Criar o gráfico de barras com ggplot2
+p3 <- ggplot(data = dados, aes(x = tipoTracao, y = mediaConsumoEnergiaKWh100Km, fill = tipoTracao)) +
+  geom_bar(stat = "summary", fun = "mean", color = "black") +
+  labs(x = "state_holiday", y = "Média do Consumo de Energia") + 
+  theme(legend.position = "none")
+
+# Criação do gráfico de densidade
+p4 <- ggplot(dados, aes(x = mediaConsumoEnergiaKWh100Km, fill = tipoTracao)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_discrete(name = "Tipo de Freios") +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+
+# Organização dos subplots lado a lado
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+
+rm(p1 ,p2 ,p3 , p4)
+```
+
+
+## 3.2 Análise Multivariada 
+
+
+### 3.2.1 Variáveis Numericas
+```{r}
+# Explorando relacionamento entre as variáveis: Matriz de Correlação - corrplot
+corrplot(cor(dados %>% select_if(is.numeric), method = "spearman"), method = "color", type = "upper", order = "hclust", tl.cex = 0.8, tl.srt = 45)
+```
+
+### 3.2.2 Variáveis Categoricas
+
+```{r}
+assocstats(table(dados$tipoTracao, dados$tipoFreios))
+```
+
+Valor-p: O valor-p associado ao teste de qui-quadrado é menor que 0,05 (p < 0,05). Isso indica que há evidências estatísticas para rejeitar a hipótese nula de que não há associação entre as variáveis "tipoTracao" e "tipoFreios". Em outras palavras, existe uma associação significativa entre essas variáveis.
+
+Coeficiente de Cramér-V: O coeficiente de Cramér-V é uma medida de associação entre variáveis categóricas. No caso, o valor de Cramér's V é 0,499. Esse valor varia de 0 a 1, onde 0 indica nenhuma associação e 1 indica associação completa. Um valor de 0,499 sugere uma associação moderada entre as variáveis "tipoTracao" e "tipoFreios".
+
+
+## 3.3 Análise Bivariada
+
+
+#### Hipótese 1: Carros que possuem menor tempo de aceleração de 0 a 100Km/h possuem menor media de consumo de Energia. Qual a correlação entre essas duas variáveis?
+
+
+
+```{r}
+# Primeiro subplot: scatterplot
+p1 <- ggplot(dados, aes(x = aceleracao0a100KmHS, y = mediaConsumoEnergiaKWh100Km)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "aceleração 0-100 Km/h (s)", y = "Consumo de Energia Médio (KWh/100Km)")
+
+# Segundo subplot: barplot
+cuts <- seq(floor(min(dados$aceleracao0a100KmHS)), ceiling(max(dados$aceleracao0a100KmHS)), length.out = 7)
+
+dados$aceleracao0a100KmHS_binned  <- cut(dados$aceleracao0a100KmHS, breaks = cuts, order_result = ordered)
+
+p2 <- dados %>%
+  group_by(aceleracao0a100KmHS_binned) %>%
+  summarise(media_ConsumoEnergia = mean(mediaConsumoEnergiaKWh100Km)) %>%
+    ggplot( aes(x = aceleracao0a100KmHS_binned, y = media_ConsumoEnergia)) +
+    geom_bar(stat = "identity") +
+    labs(x = "aceleração 0-100 Km/h (s)", y = "Consumo de Energia Médio (KWh/100Km)") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Terceiro subplot: heatmap de correlação
+cor_mat <- cor(dados %>% select(aceleracao0a100KmHS, mediaConsumoEnergiaKWh100Km), method = "spearman")
+
+# Transforme a matriz de correlação em um data.frame
+cor_df <- melt(cor_mat)
+
+# Plot a matriz de correlação como um gráfico de azulejos
+p3 <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = round(value, digits = 2)), color = "black", size = 4) + # Adiciona rótulos
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  theme(axis.text.x = element_blank(),  # Oculta os rótulos do eixo x
+        axis.text.y = element_blank(),  # Oculta os rótulos do eixo y
+        axis.title.x = element_blank(), # Oculta o título do eixo x
+        axis.title.y = element_blank(), # Oculta o título do eixo y
+        legend.position = "none") +
+  theme(legend.position = "none")
+
+
+
+
+# Organização dos subplots lado a lado
+grid.arrange(p1, p2, p3, ncol = 3)
+
+dados <- subset(dados, select = -aceleracao0a100KmHS_binned)
+rm(cuts, p1 ,p2 ,p3 , cor_mat, cor_df)
+```
+
+De acordo com os gráficos o coeficiente de correlação é ligeiramente negativo, indicando que há uma correlação negativa fraca entre as variáveis. Isso significa que, à medida que o tempo de aceleração de 0 a 100Km/h aumenta, o consumo medio de Energia tende a diminuir, mas a relação não é muito forte. 
+
+#### Hipótese 2: Carros que possuem maior peso bruto permissivel possuem maior media de consumo de energia. Qual a correlação entre essas duas variáveis?
+
+```{r}
+# Primeiro subplot: scatterplot
+p1 <- ggplot(dados, aes(x = pesoBrutoPermissivelKg, y = mediaConsumoEnergiaKWh100Km)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "peso bruto permissível (kg)", y = "Consumo de Energia Médio (KWh/100Km)")
+
+# Segundo subplot: barplot
+cuts <- seq(floor(min(dados$pesoBrutoPermissivelKg)-1), ceiling(max(dados$pesoBrutoPermissivelKg)), length.out = 10)
+
+dados$pesoBrutoPermissivelKg_binned  <- cut(dados$pesoBrutoPermissivelKg, breaks = cuts, order_result = ordered)
+
+p2 <- dados %>%
+  group_by(pesoBrutoPermissivelKg_binned) %>%
+  summarise(media_ConsumoEnergia = mean(mediaConsumoEnergiaKWh100Km)) %>%
+    ggplot( aes(x = pesoBrutoPermissivelKg_binned, y = media_ConsumoEnergia, fill=pesoBrutoPermissivelKg_binned)) +
+    geom_bar(stat = "identity") +
+    labs(x = "peso bruto permissível (kg)", y = "Consumo de Energia Médio (KWh/100Km)") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+
+# Terceiro subplot: heatmap de correlação
+cor_mat <- cor(dados %>% select(pesoBrutoPermissivelKg, mediaConsumoEnergiaKWh100Km), method = "spearman")
+
+# Transforme a matriz de correlação em um data.frame
+cor_df <- melt(cor_mat)
+
+# Plot a matriz de correlação como um gráfico de azulejos
+p3 <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = round(value, digits = 2)), color = "black", size = 4) + # Adiciona rótulos
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  theme(axis.text.x = element_blank(),  # Oculta os rótulos do eixo x
+        axis.text.y = element_blank(),  # Oculta os rótulos do eixo y
+        axis.title.x = element_blank(), # Oculta o título do eixo x
+        axis.title.y = element_blank(), # Oculta o título do eixo y
+        legend.position = "none")
+
+
+
+# Combine os subplots em uma única plotagem usando a função cowplot::plot_grid
+# Organização dos subplots lado a lado
+grid.arrange(p1, p2, p3, ncol = 3)
+
+dados <- subset(dados, select = -pesoBrutoPermissivelKg_binned)
+rm(cuts, p1 ,p2 ,p3 , cor_mat, cor_df)
+```
+De acordo com os gráficos o coeficiente de correlação é positivo. Isso significa que, à medida que o peso bruto permissivel aumenta, o consumo medio de energia tende a aumentar.
+
+#### Hipótese 3: Carros que possuem maior autonomia (km) possuem menor media de consumo de Energia (KWh/100km). Qual a correlação entre essas duas variáveis?
+
+
+```{r}
+# Cálculo do coeficiente de correlação e valor-p
+print(cor.test(dados$autonomiaWLTPkm, dados$mediaConsumoEnergiaKWh100Km, method = "kendall"))
+```
+
+Inconclusivo. Como o valor p retornado é maior que 0.05, então a hipótese nula não pode ser rejeitada. Em outras palavras, não há evidências estatísticas suficientes para suportar a hipótese alternativa de que existe uma correlação significativa entre a autonomia e o consumo de energia.
+
+
+#### Hipótese 4: Carros elétricos mais caros possuam uma maior média de consumo de energia.  Qual a correlação entre essas duas variáveis?
+
+```{r}
+# Primeiro subplot: scatterplot
+p1 <- ggplot(dados, aes(x = precoMinimoBrutoPLN, y = mediaConsumoEnergiaKWh100Km)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "preço mínimo (PLN)", y = "Consumo de Energia Médio (KWh/100Km)")
+
+# Segundo subplot: barplot
+cuts <- seq(floor(min(dados$precoMinimoBrutoPLN)-1), ceiling(max(dados$precoMinimoBrutoPLN)), length.out = 10)
+
+dados$precoMinimoBrutoPLN_binned  <- cut(dados$precoMinimoBrutoPLN, breaks = cuts, order_result = ordered)
+
+p2 <- dados %>%
+  group_by(precoMinimoBrutoPLN_binned) %>%
+  summarise(media_ConsumoEnergia = mean(mediaConsumoEnergiaKWh100Km)) %>%
+    ggplot( aes(x = precoMinimoBrutoPLN_binned, y = media_ConsumoEnergia, fill=precoMinimoBrutoPLN_binned)) +
+    geom_bar(stat = "identity") +
+    labs(x = "preço mínimo (PLN)", y = "Consumo de Energia Médio (KWh/100Km)") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "none")
+
+
+# Terceiro subplot: heatmap de correlação
+cor_mat <- cor(dados %>% select(precoMinimoBrutoPLN, mediaConsumoEnergiaKWh100Km), method = "spearman")
+
+# Transforme a matriz de correlação em um data.frame
+cor_df <- melt(cor_mat)
+
+# Plot a matriz de correlação como um gráfico de azulejos
+p3 <- ggplot(cor_df, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = round(value, digits = 2)), color = "black", size = 4) + # Adiciona rótulos
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  theme(axis.text.x = element_blank(),  # Oculta os rótulos do eixo x
+        axis.text.y = element_blank(),  # Oculta os rótulos do eixo y
+        axis.title.x = element_blank(), # Oculta o título do eixo x
+        axis.title.y = element_blank(), # Oculta o título do eixo y
+        legend.position = "none")
+
+
+
+# Combine os subplots em uma única plotagem usando a função cowplot::plot_grid
+# Organização dos subplots lado a lado
+grid.arrange(p1, p2, p3, ncol = 3)
+
+dados <- subset(dados, select = -precoMinimoBrutoPLN_binned)
+rm(cuts, p1 ,p2 ,p3 , cor_mat, cor_df)
+```
+
+De acordo com os gráficos o coeficiente de correlação é positivo. Isso significa que, à medida que o valor de uma variável aumenta, o valor da outra variável tende a aumentar.
+
+#### Hipótese 5: Carros elétricos com tração nas quatro rodas (4WD) possuam uma maior média de consumo de energia. Qual a correlação entre essas duas variáveis?
+
+
+O teste ANOVA é usado para comparar as médias de grupos diferentes e determinar se há diferenças significativas entre eles.
+
+As premissas do teste ANOVA são as seguintes:
+
+1. Independência: As observações devem ser independentes umas das outras. Isso significa que os valores em uma condição não devem ser influenciados pelos valores em outras condições.
+
+2. Normalidade: As distribuições dos dados dentro de cada grupo devem ser aproximadamente normais. Isso significa que os resíduos do modelo devem seguir uma distribuição normal.
+
+3. Homogeneidade das variâncias: As variâncias dos grupos devem ser aproximadamente iguais. Isso significa que a variabilidade dos dados deve ser semelhante em cada grupo.
+
+Sera considerada verdadeira a premissa 1.
+
+```{r}
+
+# Teste de Normalidade Shapiro-Wilk em cada grupo de tração
+# H0: Os dados são normalmente distribuídos
+# H1: Os dados não são normalmente distribuídos
+
+print(shapiro.test(dados$mediaConsumoEnergiaKWh100Km[dados$tipoTracao == '2WD (front)']) )
+print(shapiro.test(dados$mediaConsumoEnergiaKWh100Km[dados$tipoTracao == '2WD (rear)']) )
+print(shapiro.test(dados$mediaConsumoEnergiaKWh100Km[dados$tipoTracao == '4WD']) )
+
+```
+
+O p-value em todos os grupos é maior que 0,05, logo não háevidências suficientes para rejeitar a hipótese nula em cada um dos grupos.
+
+
+```{r}
+# Validamos primeiro a suposição 2 usando o Teste de Levene
+
+# Hipótese nula (H0): A variância é igual entre os grupos.
+# Hipótese alternativa (HA): A variância é diferente entre os grupos.
+
+leveneTest(mediaConsumoEnergiaKWh100Km ~ tipoTracao, data = dados)
+```
+
+O p-valor obtido é maior que 0.05, logo não há evidências suficientes para rejeitar a hipótese nula de igualdade de variâncias entre os grupos. 
+
+```{r}
+# Teste ANOVA
+# H0: Não há diferença significativa na média de crescimento dos dentes entre os diferentes níveis/grupos de dose 
+# e suplemento.
+# Ha: Há pelo menos uma diferença significativa na média de crescimento dos dentes entre os diferentes 
+# níveis de dose e suplemento.
+
+aov(mediaConsumoEnergiaKWh100Km ~ tipoTracao, dados)
+```
+
+O valor p é menor que 0.05 indicando que há evidências estatísticas para rejeitar a hipótese nula de que não há diferenças significativas entre os grupos de tração. Assim, podemos concluir que há uma relação significativa entre o tipo de tração dos carros e a media de consumo de energia.
+
+
+#### Hipótese 5: Carros elétricos com greios a disco nas 4 rodas possuam uma maior média de consumo de energia. Qual a correlação entre o tipo de freio e o consumo de nergia?
+
+Será aplicado o teste ANOVA
+
+Sera considerada verdadeira a premissa de independência entre as amostra.
+
+```{r}
+
+# Teste de Normalidade Shapiro-Wilk em cada grupo para validar a premissa de normalidade
+# H0: Os dados são normalmente distribuídos
+# H1: Os dados não são normalmente distribuídos
+
+niveis <- levels(dados$tipoFreios)
+
+print(shapiro.test(dados$mediaConsumoEnergiaKWh100Km[dados$tipoFreios == niveis[1]]) )
+print(shapiro.test(dados$mediaConsumoEnergiaKWh100Km[dados$tipoFreios == niveis[2]]) )
+
+rm(niveis)
+```
+
+
+O p-value em um dos grupos é menor que 0,05, logo não há evidências suficientes para não rejeitar a hipótese nula em um dos grupos.
+
+Como a premissa de normalidade não foi atendida a aplicação do tesste ANOVA não é apropriada. Assim será utilizado o teste não parámetrico de Kruskal-Wallis.
+
+
+```{r}
+# Teste de Kruskal-Wallis
+# H0 (Hipótese Nula): As distribuições das variáveis nos diferentes grupos são iguais.
+# HA (Hipótese Alternativa): Pelo menos uma das distribuições das variáveis nos grupos é diferente.
+
+kruskal.test(mediaConsumoEnergiaKWh100Km ~ tipoFreios, data = dados)
+```
+
+Como o valor de p (0.05854) é maior que o nível de significância comum de 0.05, não temos evidências estatisticamente significativas para rejeitar a hipótese nula. Isso significa que não há diferenças estatisticamente significativas nas medianas da variável mediaConsumoEnergiaKWh100Km entre os grupos definidos por tipoFreios.
+
+
+# Passo 5 - Preparação dos Dados
+
+
+## 5.1 Divisão dos Dados em Conjunto de Treinamento e Teste
+
+```{r}
+# Divisão em treino e teste
+set.seed(123)  # Define uma semente para a reprodutibilidade
+indexes <- createDataPartition(dados$mediaConsumoEnergiaKWh100Km, p = 0.8, list = FALSE)
+train_data <- dados[indexes, ]
+test_data <- dados[-indexes, ]
+
+rm(indexes)
+```
+
+
+
+## 5.2 Normalização (Zscore)
+
+De acordo com a análise univariada das variáveis numéricas (seção 3.1.2), há apenas duas variáveis com distribuição normal ou próxima de normal (autonomiaWLTPkm e aceleracao0a100KmHS).
+
+
+```{r}
+
+# Cria o objeto de pré-processamento
+preprocess_obj <- preProcess(train_data[, c('autonomiaWLTPkm', 'aceleracao0a100KmHS')], method = c("center", "scale"))
+
+# Aplica a transformação Zscore nos dados de treino
+train_data_normalized_1 <- predict(preprocess_obj, train_data[, c('autonomiaWLTPkm', 'aceleracao0a100KmHS')])
+
+# Aplica a transformação Zscore nos dados de teste
+test_data_normalized_1 <- predict(preprocess_obj, test_data[, c('autonomiaWLTPkm', 'aceleracao0a100KmHS')])
+
+rm(preprocess_obj)
+```
+
+## 5.3 Rescaling
+
+A normalização Min-Max é mais adequada quando os dados não seguem uma distribuição normal.
+
+```{r}
+
+# Obtém todos os nomes de colunas numéricas, exceto as especificadas
+colunas_selecionadas <- setdiff(names(train_data %>% select_if(is.numeric)), 
+                                c('autonomiaWLTPkm', 'aceleracao0a100KmHS', 'mediaConsumoEnergiaKWh100Km'))
+
+# A normalização MinMax é mais recomendada em dados que apresentam outliers
+preprocess_obj <- preProcess(train_data[, colunas_selecionadas], method = "range")
+
+# Aplica a transformação MinMax nos dados de treino
+train_data_normalized_2 <- predict(preprocess_obj, train_data[, colunas_selecionadas])
+
+# Aplica a transformação MinMax nnos dados de teste
+test_data_normalized_2 <- predict(preprocess_obj, test_data[, colunas_selecionadas])
+
+
+rm(colunas_selecionadas, preprocess_obj)
+
+```
+
+
+```{r}
+# Concatenando com as variáveis categoricas
+train_data_normalized <- cbind(train_data_normalized_1, 
+                               train_data_normalized_2,
+                               train_data %>% select(where(is.factor), mediaConsumoEnergiaKWh100Km))
+
+test_data_normalized <- cbind(test_data_normalized_1, 
+                              test_data_normalized_2,
+                              test_data %>% select(where(is.factor), mediaConsumoEnergiaKWh100Km))
+
+rm(train_data_normalized_1, train_data_normalized_2)
+rm(test_data_normalized_1, test_data_normalized_2)
+rm(train_data, test_data)
+```
+
+
+# Passo 6 - Seleção de Variáveis
+
+
+```{r}
+# Separe as variáveis preditoras e a variável alvo
+pred_vars <- select(train_data_normalized, -mediaConsumoEnergiaKWh100Km)
+target_var <- train_data_normalized$mediaConsumoEnergiaKWh100Km
+
+# Realize a seleção de variáveis usando o Boruta
+boruta_obj <- Boruta(pred_vars, target_var)
+
+# Acesse as variáveis confirmadas como importantes
+important_variables <- names(boruta_obj$finalDecision[boruta_obj$finalDecision == "Confirmed"])
+
+# Exiba as variáveis
+print(important_variables)
+
+rm(pred_vars, target_var)
+```
+
+Serão utilizados as 13 variáveis mais importantes identificadas pelo algoritmo Boruta inicialmente.
+
+```{r}
+# Visualize as variáveis selecionadas pelo Boruta
+plot(boruta_obj, cex.axis = 0.7, las = 2)
+
+rm(boruta_obj)
+```
+
+
+```{r}
+X_train <- train_data_normalized[, important_variables]
+y_train <- train_data_normalized$mediaConsumoEnergiaKWh100Km
+
+X_test <- test_data_normalized[,important_variables]
+y_test <- test_data_normalized$mediaConsumoEnergiaKWh100Km
+```
+
+
+# Passo 07 - Modelagem de Machine Learning
+
+
+
+```{r}
+
+# Função auxiliar para o cálculos das métricas de performance para cada modelo
+ml_error <- function( model_name, y, y_hat, R2){
+# k = número de variáveis independentes
+  e <- y- y_hat
+  MAE <- mean(abs(e))
+  MAPE <- mean(abs((e)/y)*100)
+  MSE <- mean(e^2)
+  RMSE <- sqrt(MSE)
+  
+  return(data.frame('Model Name' = model_name, MAE = MAE, MAPE = MAPE, MSE = MSE, RMSE = RMSE))
+}
+
+```
+
+## 7.1 Modelo de Regressão Linear
+
+```{r}
+# model
+modelo_lr <- lm(y_train ~ ., data = X_train)
+
+# prediction
+yhat_lr = predict(modelo_lr, newdata = X_test)
+
+# performance
+lr_result = ml_error( 'Linear Regression', y_test, yhat_lr)
+lr_result
+```
+
+
+
+## 7.2 Modelo de Regressão Linear - Ridge
+
+```{r}
+# model
+modelo_lrr <- glmnet(as.matrix(X_train), y_train, alpha = 1)
+
+# prediction
+yhat_lrr = predict(modelo_lrr, newx = as.matrix(X_test), s= 0.01)
+
+# performance
+lrr_result = ml_error( 'Linear Regression - Ridge', y_test, yhat_lrr)
+lrr_result
+```
+
+## 7.3 Modelo de Árvore de Decisão
+
+```{r}
+# Construir o modelo de regressão com rpart
+modelo_ad <- rpart(y_train ~ ., data = X_train)
+
+# prediction
+yhat_ad= predict(modelo_ad, newdata = X_test)
+
+# performance
+ad_result = ml_error( 'Decision Tree', y_test, yhat_ad)
+ad_result
+```
+
+## 7.4 Modelo Random Forest
+
+```{r}
+modelo_rf <- randomForest(y_train ~ ., data = X_train)
+
+# prediction
+yhat_rf= predict(modelo_rf, newdata = X_test)
+
+# performance
+rf_result = ml_error( 'Random Forest', y_test, yhat_rf)
+rf_result
+
+```
+
+## 7.5 Modelo SVM
+
+```{r}
+
+# Treinamento do modelo SVM com valores padrão
+modelo_svm <- svm(y_train ~ ., data = X_train, 
+                  type = 'eps-regression', 
+                  kernel = 'linear', 
+                  C = 1, 
+                  epsilon = 0.1)
+
+# Fazer previsões nos dados de treinamento
+yhat_svm <- predict(modelo_svm, X_test)
+
+# performance
+svm_result = ml_error( 'SVM', y_test, yhat_svm)
+svm_result
+
+```
+
+## 7.6 Comparação de Desempenho
+
+
+```{r}
+resultados <- rbind(lr_result, lrr_result, ad_result, rf_result, svm_result)
+resultados[order(resultados$RMSE), ]
+
+```
+
+O modelo Linear Regression com regularização Ridge apresenta o menor RMSE. A métrica RMSE atribui maior peso aos erros maiores, sendo aconselhavel para selecionar modelos> selecionar o melho modelos.
+
+# Passo 08 - Tradução e Interpretação do Erro
+
+```{r}
+
+resultadoFinal <- as.data.frame(cbind(y_test, yhat_lrr))
+names(resultadoFinal) <- c('mediaConsumoEnergiaKWh100Km', 'predictions')
+
+
+resultadoFinal <-  mutate(resultadoFinal, residuals = predictions - mediaConsumoEnergiaKWh100Km,
+                                          error_rate = predictions/mediaConsumoEnergiaKWh100Km)
+
+# Plotando os resíduos
+p1 <- ggplot(resultadoFinal, aes(x = error_rate)) +
+  #geom_histogram(aes(y = after_stat(density)), binwidth = 1, fill = "steelblue", color = "black") +
+  geom_density(fill = "lightblue", alpha = 0.5, color = "blue") +
+  labs(x = "Error Rate", y = "Frequency") +
+  theme_minimal()
+
+p2 <- ggplot(resultadoFinal, aes(x = predictions, y = residuals)) +
+  geom_point(color = "blue") +
+  labs(x = "Predictions", y = "Residuals") +
+  theme_minimal()
+
+
+# Combine os subplots em uma única plotagem usando a função cowplot::plot_grid
+# Organização dos subplots lado a lado
+grid.arrange(p1, p2, ncol = 2)
+```
+
+```{r}
+qqnorm(resultadoFinal$residuals)
+qqline(resultadoFinal$residuals)
+```
+
+
