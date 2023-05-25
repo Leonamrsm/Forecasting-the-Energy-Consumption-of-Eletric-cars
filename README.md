@@ -76,3 +76,17 @@ Fice hypotheses were validated in the exploratory data analysis. Below are 3 of 
 
 ***Inconclusive:*** As the returned p-value is greater than 0.05, then the null hypothesis cannot be rejected. In other words, there is not enough statistical evidence to support the alternative hypothesis that there is a significant correlation between autonomy and energy consumption.
 
+## Machine Learning Modeling Performance
+
+Five different models (linear regression, regularized linear regression - ridge, Decision Tree, random forest and svm ) were evaluated, separating 20% of the samples at random as test data.
+
+
+|Model|MAE|MAPE|MSE|RMSE|
+|-----------------------------|------------------|-------------|------------------|-----------------|
+|Linear Regression - Ridge    |1.9756	          |10.284977	   |8.206758	       |2.864744         |
+|Random Forest                |1.870330	       |9.079062	   |8.283471	       |2.878102         |
+|Decision Tree                |1.617262	       |7.501639	   |8.896838	       |2.982757         |
+|Linear Regression            |2.076462	       |10.737045	   |9.226348	       |3.037490         |
+|SVM                          |2.073125	       |10.770340	   |10.000897	       |3.162419         |
+
+The Linear Regression model with Ridge regularization has the lowest RMSE. The RMSE metric assigns greater weight to larger errors, being a more advisable metric to select the best model.
