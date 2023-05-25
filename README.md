@@ -73,5 +73,6 @@ Fice hypotheses were validated in the exploratory data analysis. Below are 3 of 
 - **Hypothesis 3:** Cars that have greater autonomy (km) have lower average energy consumption (KWh/100km)
    
 ![](img/H3.png)
+
 ***Inconclusive:*** As the returned p-value is greater than 0.05, then the null hypothesis cannot be rejected. In other words, there is not enough statistical evidence to support the alternative hypothesis that there is a significant correlation between autonomy and energy consumption.
 
