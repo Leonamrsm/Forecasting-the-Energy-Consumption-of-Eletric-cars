@@ -52,7 +52,6 @@ In order to solve this challenge, the work went along the following steps:
 4. **Data Preparation:** preprocessing stage required prior to the machine learning modeling step.
 5. **Feature Selection:** selection of the most significant attributes for training the model.
 6. **Machine Learning Modeling:** implementation of a few algorithms appropriate to the task at hand. In this case, models befitting the *regression* assignment - *i.e.*, forecasting a continuous value, namely sales.
-8. **Translation and Interpretation of the Model Performance:** conversion of the performance metrics of the Machine Learning model to a more tangible business result.
 
 Fice hypotheses were validated in the exploratory data analysis. Below are 3 of the hypotheses that were arrested:
 
