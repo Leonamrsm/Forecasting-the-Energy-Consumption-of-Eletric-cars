@@ -62,3 +62,9 @@ Fice hypotheses were validated in the exploratory data analysis. Below are 3 of 
 ![](img/H1.png)
 
 ***True:*** according to the graphs, the correlation coefficient is slightly negative, indicating that there is a weak negative correlation between the variables.
+
+
+- **Hypothesis 2:** Cars that have a higher permissible gross weight have a higher average energy consumption.
+   
+![](img/H1.png)
+***True:*** according to the graphs, the correlation coefficient is slightly negative, indicating that there is a weak negative correlation between the variables.
