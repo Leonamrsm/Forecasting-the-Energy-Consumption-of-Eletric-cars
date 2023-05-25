@@ -59,6 +59,6 @@ Fice hypotheses were validated in the exploratory data analysis. Below are 3 of 
 - **Hypothesis 1:** Cars that have a shorter acceleration time from 0 to 100 km/h have a higher average energy consumption.
    
 
-![](img/H12.png)
+![](img/H1.png)
 
 ***True:*** according to the graphs, the correlation coefficient is slightly negative, indicating that there is a weak negative correlation between the variables.
