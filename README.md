@@ -66,5 +66,12 @@ Fice hypotheses were validated in the exploratory data analysis. Below are 3 of 
 
 - **Hypothesis 2:** Cars that have a higher permissible gross weight have a higher average energy consumption.
    
-![](img/H1.png)
-***True:*** according to the graphs, the correlation coefficient is slightly negative, indicating that there is a weak negative correlation between the variables.
+![](img/H2.png)
+
+***True:*** according to the graphs, the correlation coefficient is positive.
+
+- **Hypothesis 3:** Cars that have greater autonomy (km) have lower average energy consumption (KWh/100km)
+   
+![](img/H3.png)
+***Inconclusive:*** As the returned p-value is greater than 0.05, then the null hypothesis cannot be rejected. In other words, there is not enough statistical evidence to support the alternative hypothesis that there is a significant correlation between autonomy and energy consumption.
+
