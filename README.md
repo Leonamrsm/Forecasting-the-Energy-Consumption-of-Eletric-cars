@@ -42,3 +42,23 @@ The database composed of 53 electric cars (each variant of a model – which dif
 - Maximum DC charging power [kW]	
 - mean - Energy consumption [kWh/100 km]
 
+## Solution Strategy
+
+In order to solve this challenge, the work went along the following steps:
+
+1. **Data Description:** understanding of the status of the database and dealing with missing values properly. Basic statistics metrics provide an overview of the data.  
+2. **Data Filtering:** filtering of records and selection of attributes that do not contain information for modeling or that do not match the scope of the business problem.
+3. **Exploratory Data Analysis (EDA):** exploration of the data searching for insights and seeking to understand the impact of each variable on the upcoming machine learning modeling.
+4. **Data Preparation:** preprocessing stage required prior to the machine learning modeling step.
+5. **Feature Selection:** selection of the most significant attributes for training the model.
+6. **Machine Learning Modeling:** implementation of a few algorithms appropriate to the task at hand. In this case, models befitting the *regression* assignment - *i.e.*, forecasting a continuous value, namely sales.
+8. **Translation and Interpretation of the Model Performance:** conversion of the performance metrics of the Machine Learning model to a more tangible business result.
+
+Fice hypotheses were validated in the exploratory data analysis. Below are 3 of the hypotheses that were arrested:
+
+- **Hypothesis 1:** Cars that have a shorter acceleration time from 0 to 100 km/h have a higher average energy consumption.
+   
+
+![](img/H12.png)
+
+***True:*** according to the graphs, the correlation coefficient is slightly negative, indicating that there is a weak negative correlation between the variables.
